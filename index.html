@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporary Email Generator</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Inter) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
+            color: #1f2937;
+        }
+        .container {
+            max-width: 4xl;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+        .email-table {
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .email-body-preview {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .email-card {
+            display: none;
+        }
+        .email-card-body {
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: scale(0.95);
+            opacity: 0;
+        }
+        .modal.show {
+            transform: scale(1);
+            opacity: 1;
+        }
+        .modal-content {
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .toast {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateY(20px);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        .spinner {
+            border: 3px solid #e5e7eb;
+            border-top: 3px solid #2563eb;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        footer {
+            background: #1f2937;
+            color: #f3f4f6;
+            padding: 1.5rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            margin-top: 2rem;
+        }
+        footer a {
+            color: #93c5fd;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        footer a:hover {
+            color: #60a5fa;
+        }
+        .warning {
+            background: #fef2f2;
+            border: 1px solid #f87171;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            color: #991b1b;
+        }
+        @media (max-width: 640px) {
+            .email-table {
+                display: none;
+            }
+            .email-card {
+                display: block;
+            }
+            .email-card > div {
+                border-bottom: 1px solid #e5e7eb;
+                padding: 1rem;
+                border-radius: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
+            .email-body-preview {
+                max-width: 200px;
+            }
+            .modal-content {
+                max-height: 70vh;
+                padding: 1rem;
+            }
+            .container {
+                padding: 1rem;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl container">
+        <h1 class="text-3xl font-bold text-white mb-6 text-center bg-gradient-to-r from-blue-600 to-indigo-600 py-4 rounded-t-lg">Temporary Email Generator</h1>
+        <div class="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+            <button id="generateEmailBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow-md focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Generate new temporary email" title="Create a new temporary email address">Generate New Email</button>
+            <button id="refreshEmailsBtn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition shadow-md focus:ring-2 focus:ring-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hidden" aria-label="Refresh email inbox" title="Check for new emails">Refresh Emails</button>
+        </div>
+        <div class="flex flex-col sm:flex-row justify-center gap-4 mb-6">
+            <input id="customEmailInput" type="text" placeholder="Enter custom email prefix" class="border border-gray-300 rounded-lg px-4 py-3 w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Custom email prefix" title="Enter a prefix for your custom temporary email">
+            <button id="setCustomEmailBtn" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition shadow-md focus:ring-2 focus:ring-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Set custom email" title="Set your custom email address">Set Custom Email</button>
+        </div>
+        <div id="emailContainer" class="hidden mb-6 text-center">
+            <p class="text-lg font-semibold text-gray-800">Your Temporary Email:</p>
+            <div class="flex items-center justify-center mt-2 gap-2">
+                <span id="emailAddress" class="text-blue-600 font-mono text-lg break-all px-2 py-1 bg-blue-50 rounded"></span>
+
+                <button id="copyEmailBtn" class="bg-gray-200 text-gray-700 px-3 py-1 rounded-lg hover:bg-gray-300 transition shadow-sm focus:ring-2 focus:ring-gray-400 focus:outline-none" aria-label="Copy email address" title="Copy email to clipboard">Copy</button>
+            </div>
+            <p class="text-sm text-gray-500 mt-2">Expires in <span id="expiryTimer">~10 minutes</span>.</p>
+        </div>
+        <div id="toastContainer" class="fixed bottom-4 right-4 z-50" role="alert" aria-live="polite"></div>
+        <div class="email-table">
+            <table class="w-full text-left border-collapse hidden sm:table bg-white">
+                <thead class="bg-gray-100 sticky top-0">
+                    <tr>
+                        <th class="p-3 text-sm font-semibold text-gray-700">From</th>
+                        <th class="p-3 text-sm font-semibold text-gray-700">Subject</th>
+                        <th class="p-3 text-sm font-semibold text-gray-700">Body</th>
+                        <th class="p-3 text-sm font-semibold text-gray-700">Received</th>
+                    </tr>
+                </thead>
+                <tbody id="emailTableBody" class="divide-y divide-gray-200"></tbody>
+            </table>
+        </div>
+        <div id="emailCardContainer" class="email-card space-y-2"></div>
+        <!-- Modal for full email content -->
+        <div id="emailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden modal z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-2xl modal-content">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Email Details</h2>
+                    <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700 focus:outline-none" aria-label="Close email modal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modalContent" class="text-gray-700"></div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button id="copyBodyBtn" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition shadow-sm focus:ring-2 focus:ring-gray-400 focus:outline-none" aria-label="Copy email body" title="Copy email body to clipboard">Copy Body</button>
+                    <button id="closeModalBtn2" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" aria-label="Close email modal">Close</button>
+                </div>
+            </div>
+        </div>
+      
+        <div class="warning text-center">
+            <p class="font-medium"><i class="fas fa-exclamation-triangle mr-2"></i>Warning: Temporary emails are not secure. Do not use them for important or sensitive activities, such as banking or account recovery, as they may be accessible to others.</p>
+        </div>
+        <footer class="flex flex-col items-center gap-2">
+            <p>Copyright &copy; 2025 Hugo Wong. All rights reserved.</p>
+            <div class="flex gap-4">
+                 
+        </footer>
+    </div>
+
+    <script>
+        // API base URL (Guerrilla Mail)
+        const API_BASE = 'https://api.guerrillamail.com';
+        let currentEmail = null;
+        let emailToken = null;
+        let emailCheckInterval = null;
+        let expiryTime = null;
+        let currentEmailBody = ''; // Store for copying
+
+        // DOM elements
+        const generateEmailBtn = document.getElementById('generateEmailBtn');
+        const refreshEmailsBtn = document.getElementById('refreshEmailsBtn');
+        const customEmailInput = document.getElementById('customEmailInput');
+        const setCustomEmailBtn = document.getElementById('setCustomEmailBtn');
+        const emailContainer = document.getElementById('emailContainer');
+        const emailAddressSpan = document.getElementById('emailAddress');
+        const copyEmailBtn = document.getElementById('copyEmailBtn');
+        const emailTableBody = document.getElementById('emailTableBody');
+        const emailCardContainer = document.getElementById('emailCardContainer');
+        const toastContainer = document.getElementById('toastContainer');
+        const emailModal = document.getElementById('emailModal');
+        const modalContent = document.getElementById('modalContent');
+        const copyBodyBtn = document.getElementById('copyBodyBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const closeModalBtn2 = document.getElementById('closeModalBtn2');
+        const expiryTimerSpan = document.getElementById('expiryTimer');
+
+        // Show toast notification
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type === 'error' ? 'bg-red-500' : 'bg-green-600'} text-white px-4 py-3 rounded-lg shadow-lg`;
+            toast.textContent = message;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Show loading state
+        function setLoading(isLoading, element) {
+            if (isLoading) {
+                element.innerHTML = `<span class="spinner"></span>`;
+                element.disabled = true;
+            } else {
+                element.textContent = element.id === 'generateEmailBtn' ? 'Generate New Email' : element.id === 'setCustomEmailBtn' ? 'Set Custom Email' : 'Refresh Emails';
+                element.disabled = false;
+            }
+        }
+
+        // Update expiry timer
+        function updateExpiryTimer() {
+            if (!expiryTime) return;
+            const timeLeft = Math.max(0, Math.floor((expiryTime - Date.now()) / 1000));
+            expiryTimerSpan.textContent = `${Math.floor(timeLeft / 60)}m ${timeLeft % 60}s`;
+            if (timeLeft === 0) {
+                showToast('Email expired. Generating new email...', 'error');
+                generateEmail();
+            }
+        }
+
+        // Retry mechanism
+        async function fetchWithRetry(url, options, retries = 3, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({}));
+                        throw new Error(`HTTP ${response.status}: ${errorData.error || 'Request failed'}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    if (i < retries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+        }
+
+        // Generate new email address
+        async function generateEmail() {
+            setLoading(true, generateEmailBtn);
+            try {
+                if (emailCheckInterval) clearInterval(emailCheckInterval);
+                const data = await fetchWithRetry(`${API_BASE}/ajax.php?f=get_email_address`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!data.email_addr || !data.sid_token) throw new Error('Invalid API response: Missing email or token');
+
+                currentEmail = data.email_addr;
+                emailToken = data.sid_token;
+                expiryTime = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+                emailAddressSpan.textContent = currentEmail;
+                emailContainer.classList.remove('hidden');
+                refreshEmailsBtn.classList.remove('hidden');
+                emailTableBody.innerHTML = '';
+                emailCardContainer.innerHTML = '';
+
+                await checkEmails();
+                emailCheckInterval = setInterval(checkEmails, 10000);
+                setInterval(updateExpiryTimer, 1000);
+                updateExpiryTimer();
+            } catch (error) {
+                showToast(`Error generating email: ${error.message}`, 'error');
+            } finally {
+                setLoading(false, generateEmailBtn);
+            }
+        }
+
+        // Set custom email address
+        async function setCustomEmail() {
+            const emailPrefix = customEmailInput.value.trim();
+            if (!emailPrefix || !/^[a-zA-Z0-9._-]+$/.test(emailPrefix)) {
+                showToast('Please enter a valid email prefix (letters, numbers, dots, underscores, or hyphens)', 'error');
+                return;
+            }
+
+            setLoading(true, setCustomEmailBtn);
+            try {
+                if (emailCheckInterval) clearInterval(emailCheckInterval);
+                const data = await fetchWithRetry(`${API_BASE}/ajax.php?f=set_email_user&sid_token=${emailToken}&email_user=${encodeURIComponent(emailPrefix)}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (!data.email_addr || !data.sid_token) throw new Error('Invalid API response: Missing email or token');
+
+                currentEmail = data.email_addr;
+                emailToken = data.sid_token;
+                expiryTime = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+                emailAddressSpan.textContent = currentEmail;
+                emailContainer.classList.remove('hidden');
+                refreshEmailsBtn.classList.remove('hidden');
+                emailTableBody.innerHTML = '';
+                emailCardContainer.innerHTML = '';
+                customEmailInput.value = '';
+
+                await checkEmails();
+                emailCheckInterval = setInterval(checkEmails, 10000);
+                setInterval(updateExpiryTimer, 1000);
+                updateExpiryTimer();
+                showToast('Custom email set successfully!', 'success');
+            } catch (error) {
+                showToast(`Error setting custom email: ${error.message}`, 'error');
+            } finally {
+                setLoading(false, setCustomEmailBtn);
+            }
+        }
+
+        // Fetch full email content
+        async function fetchEmailContent(emailId) {
+            try {
+                const data = await fetchWithRetry(`${API_BASE}/ajax.php?f=fetch_email&email_id=${emailId}&sid_token=${emailToken}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+                return data.mail_body || 'No content available';
+            } catch (error) {
+                showToast(`Error fetching email content: ${error.message}`, 'error');
+                return 'Failed to load content';
+            }
+        }
+
+        // Show email modal
+        async function showEmailModal(email) {
+            currentEmailBody = await fetchEmailContent(email.mail_id);
+            modalContent.innerHTML = `
+                <p class="mb-2"><strong>From:</strong> ${email.mail_from || 'Unknown'}</p>
+                <p class="mb-2"><strong>Subject:</strong> ${email.mail_subject || 'No Subject'}</p>
+                <p class="mb-2"><strong>Date:</strong> ${email.mail_timestamp ? new Date(email.mail_timestamp * 1000).toLocaleString() : 'Unknown'}</p>
+                <p class="mb-2"><strong>Body:</strong></p>
+                <div class="modal-content text-sm">${currentEmailBody}</div>
+            `;
+            emailModal.classList.remove('hidden');
+            setTimeout(() => emailModal.classList.add('show'), 10);
+        }
+
+        // Check for new emails
+        async function checkEmails() {
+            if (!currentEmail || !emailToken) return;
+            setLoading(true, refreshEmailsBtn);
+            try {
+                const data = await fetchWithRetry(`${API_BASE}/ajax.php?f=get_email_list&offset=0&sid_token=${emailToken}`, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                const emails = data.list || [];
+                emailTableBody.innerHTML = '';
+                emailCardContainer.innerHTML = '';
+
+                emails.forEach(email => {
+                    // Table row (desktop)
+                    const row = document.createElement('tr');
+                    row.className = 'cursor-pointer hover:bg-gray-100 transition';
+                    row.innerHTML = `
+                        <td class="p-3 text-sm">${email.mail_from || 'Unknown'}</td>
+                        <td class="p-3 text-sm">${email.mail_subject || 'No Subject'}</td>
+                        <td class="p-3 text-sm email-body-preview">${(email.mail_excerpt || '').substring(0, 100)}</td>
+                        <td class="p-3 text-sm">${email.mail_timestamp ? new Date(email.mail_timestamp * 1000).toLocaleString() : 'Unknown'}</td>
+                    `;
+                    row.addEventListener('click', () => showEmailModal(email));
+                    emailTableBody.appendChild(row);
+
+                    // Card (mobile)
+                    const card = document.createElement('div');
+                    card.className = 'bg-white rounded-lg shadow p-4 cursor-pointer hover:bg-gray-100 transition';
+                    card.innerHTML = `
+                        <p class="mb-1"><strong>From:</strong> ${email.mail_from || 'Unknown'}</p>
+                        <p class="mb-1"><strong>Subject:</strong> ${email.mail_subject || 'No Subject'}</p>
+                        <p class="mb-1"><strong>Body:</strong> <span class="email-card-body">${(email.mail_excerpt || '').substring(0, 100)}</span>...</p>
+                        <p><strong>Date:</strong> ${email.mail_timestamp ? new Date(email.mail_timestamp * 1000).toLocaleString() : 'Unknown'}</p>
+                    `;
+                    card.addEventListener('click', () => showEmailModal(email));
+                    emailCardContainer.appendChild(card);
+                });
+            } catch (error) {
+                showToast(`Error fetching emails: ${error.message}`, 'error');
+            } finally {
+                setLoading(false, refreshEmailsBtn);
+            }
+        }
+
+        // Copy email to clipboard
+        copyEmailBtn.addEventListener('click', () => {
+            if (currentEmail) {
+                navigator.clipboard.writeText(currentEmail)
+                    .then(() => {
+                        copyEmailBtn.textContent = 'Copied!';
+                        showToast('Email copied to clipboard!', 'success');
+                        setTimeout(() => copyEmailBtn.textContent = 'Copy', 2000);
+                    })
+                    .catch(() => showToast('Failed to copy email', 'error'));
+            }
+        });
+
+        // Copy email body
+        copyBodyBtn.addEventListener('click', () => {
+            if (currentEmailBody) {
+                navigator.clipboard.writeText(currentEmailBody)
+                    .then(() => {
+                        copyBodyBtn.textContent = 'Copied!';
+                        showToast('Email body copied to clipboard!', 'success');
+                        setTimeout(() => copyBodyBtn.textContent = 'Copy Body', 2000);
+                    })
+                    .catch(() => showToast('Failed to copy email body', 'error'));
+            }
+        });
+
+        // Close modal
+        function closeModal() {
+            emailModal.classList.remove('show');
+            setTimeout(() => emailModal.classList.add('hidden'), 300);
+        }
+        closeModalBtn.addEventListener('click', closeModal);
+        closeModalBtn2.addEventListener('click', closeModal);
+
+        // Close modal on outside click
+        emailModal.addEventListener('click', (e) => {
+            if (e.target === emailModal) closeModal();
+        });
+
+        // Event listeners
+        generateEmailBtn.addEventListener('click', generateEmail);
+        refreshEmailsBtn.addEventListener('click', checkEmails);
+        setCustomEmailBtn.addEventListener('click', setCustomEmail);
+
+        // Keyboard navigation for custom email input
+        customEmailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') setCustomEmail();
+        });
+
+        // Keyboard navigation for modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !emailModal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Generate email on page load
+        generateEmail();
+    </script>
+</body>
+</html>
